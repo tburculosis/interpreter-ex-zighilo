@@ -1,12 +1,10 @@
 const std = @import("std");
-const Error = @import("error.zig");
-const Token = @import("token.zig");
+const Error = @import("error.zig").Error;
+const Scanner = @import("token.zig").Scanner;
 
 const bugPrint = std.debug.print;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-
-//TODO - create a scanner(tokeniser)
 
 const lox = struct {
    
@@ -36,14 +34,20 @@ const lox = struct {
         try reader.interface.fill(@as(usize, file_size));
 
         bugPrint("file size: {any}\n", .{file_size});
+
+        var scanner = Scanner.init(alloc, buffer);
+        defer scanner.deinit_arrayList(alloc); 
+        try scanner.grabTokens(); //putting tokens in ArrayList
+        scanner.printTokens();
         
-        for (0..buffer.len) |i| {
-            if (i == file_size - 1) {
-                bugPrint("{c}\n", .{buffer[i]});
-            } else {
-                bugPrint("{c}", .{buffer[i]});
-            }
-        }
+        
+        // for (0..buffer.len) |i| {
+        //     if (i == file_size - 1) {
+        //         bugPrint("{c}\n", .{buffer[i]});
+        //     } else {
+        //         bugPrint("{c}", .{buffer[i]});
+        //     }
+        // }
 
     }
 
@@ -65,7 +69,7 @@ const lox = struct {
 
     fn runLine(line: []const u8, alloc: Allocator) void {
         bugPrint("Running line\n", .{});
-
+        
         for (0..line.len) |i| {
             if (i == line.len - 1) {
                 bugPrint("{c}\n", .{line[i]});
@@ -73,10 +77,8 @@ const lox = struct {
                 bugPrint("{c}", .{line[i]}); 
             }
         }
-            
-        //grab tokens and print
-        //const tokens = try Scanner.grabTokens(line, alloc);
-        //tokens.spew();
+
+        _ = alloc;
     }
 };
 
