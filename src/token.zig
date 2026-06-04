@@ -2,6 +2,7 @@ const std = @import("std");
 const bugPrint = std.debug.print;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const Error = @import("error.zig").Error;
 
 const TokenType = enum {
     
@@ -56,13 +57,15 @@ const Token = struct {
 
 pub const Scanner = struct {
     source: []const u8,
-    tokens: ArrayList(Token),
+    tokens: ArrayList(Token), //re-impliment arrayLists as multiArrayLists (from arrays of structs to structs of arrays)
+    errors: ArrayList(Error),
     alloc: Allocator,    
 
-    pub fn init(alloc: Allocator, sour: []const u8) Scanner {
+    pub fn init(alloc: Allocator, source: []const u8) Scanner {
         return .{
-            .source = sour,
+            .source = source,
             .tokens = ArrayList(Token).empty,
+            .errors = ArrayList(Error).empty,
             .alloc = alloc,
         };
     }
@@ -74,34 +77,190 @@ pub const Scanner = struct {
 
         while (current < self.source.len) {
             start = current;
-            bugPrint("{c}", .{self.source[current]});
             if (self.source[current] == '\n')  {
                 line += 1;
                 current += 1;
             } else { 
-                try scanToken(self, current, line);
+                try scanToken(self, &current, line);
                 current += 1; 
             }
         }
         try self.tokens.append(self.alloc, Token.init(TokenType.EOF, "",line));
     }
 
-    fn scanToken(self: *Scanner, current: u64, line: u64) !void {
-        const cur: u8 = self.source[current];
+    //token engine
+    fn scanToken(self: *Scanner, current: *u64, line: u64) !void {
+        const index = @as(usize, current.*);
+        const cur: u8 = self.source[index];
 
         switch (cur) {
-            '(' => { try self.tokens.append(self.alloc, Token.init(TokenType.LEFT_PAREN, "", line)); },
-            ')' => { try self.tokens.append(self.alloc, Token.init(TokenType.RIGHT_PAREN, "", line)); },
-            '{' => { try self.tokens.append(self.alloc, Token.init(TokenType.LEFT_BRACE, "", line)); },
-            '}' => { try self.tokens.append(self.alloc, Token.init(TokenType.RIGHT_BRACE, "", line)); },
-            ',' => { try self.tokens.append(self.alloc, Token.init(TokenType.COMMA, "", line)); },
-            '.' => { try self.tokens.append(self.alloc, Token.init(TokenType.DOT, "", line)); },
-            '-' => { try self.tokens.append(self.alloc, Token.init(TokenType.MINUS, "", line)); },
-            '+' => { try self.tokens.append(self.alloc, Token.init(TokenType.PLUS, "", line)); },
-            ';' => { try self.tokens.append(self.alloc, Token.init(TokenType.SEMICOLON, "",line)); },
-            '*' => { try self.tokens.append(self.alloc, Token.init(TokenType.STAR, "",line)); },
+            //ignore cases
+            '\t' => { },
+            '\r' => { },
+            ' '  => { },
+
+            //single char tokens 
+            '(' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.LEFT_PAREN,
+                    "",
+                    line)); },
+            ')' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.RIGHT_PAREN,
+                    "",
+                    line)); },
+            '{' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.LEFT_BRACE,
+                    "",
+                    line)); },
+            '}' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.RIGHT_BRACE,
+                    "",
+                    line)); },
+            ',' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.COMMA,
+                    "",
+                    line)); },
+            '.' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.DOT,
+                    "",
+                    line)); },
+            '-' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.MINUS,
+                    "",
+                    line)); },
+            '+' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.PLUS,
+                    "",
+                    line)); },
+            ';' => { try self.tokens.append(
+                self.alloc, 
+                Token.init(
+                    TokenType.SEMICOLON,
+                    "",
+                    line)); },
+            '*' => { try self.tokens.append(
+                self.alloc,
+                Token.init(
+                    TokenType.STAR,
+                    "",
+                    line)); },
+
+            //double char tokens
+            '!' => { 
+                    if ( self.source[index + 1] == '=' ) { 
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.BANG_EQUAL,
+                            "",
+                            line));
+                        current.* += 1;
+                    } else {
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.BANG,
+                            "",
+                            line));
+                    }
+                },
+            '=' =>  { 
+                    if ( self.source[index + 1] == '=' ) { 
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.EQUAL_EQUAL,
+                            "",
+                            line));
+                        current.* += 1;
+                    } else {
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.EQUAL,
+                            "",
+                            line));
+                    }
+                },
+            '<' => { 
+                    if ( self.source[index + 1] == '=' ) { 
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.LESS_EQUAL,
+                            "",
+                            line));
+                        current.* += 1;
+                    } else {
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.LESS,
+                            "",
+                            line));
+                    }
+                },
+            '>' => { 
+                    if ( self.source[index + 1] == '=' ) { 
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.GREATER_EQUAL,
+                            "",
+                            line));
+                        current.* += 1;
+                    } else {
+                        try self.tokens.append(
+                        self.alloc,
+                        Token.init(
+                            TokenType.GREATER,
+                            "",
+                            line));
+                    }
+                },
+
+            //dealing with the divide operator and the comment symbol
+            '/' => {
+                if (self.source[index + 1] == '/') {
+                    var n: u8 = 2;
+                    while (self.source[index + n] != '\n') { n += 1; }
+                    //minus 1 to trigger the newline conditional
+                    //in the calling while loop (a bit clumsy)
+                    current.* += n - 1; 
+                } else {
+                    try self.tokens.append(
+                    self.alloc,
+                    Token.init(
+                        TokenType.SLASH,
+                        "",
+                        line));
+                }
+            },
+            
+            //unrecognised token
             else => {
-                bugPrint("Unexpected token: {c}\n", .{cur});
+                try self.errors.append(
+                self.alloc,
+                Error.init(
+                    line,
+                    "Unrecognised token",
+                    cur));
             }
         }
     }
@@ -112,7 +271,11 @@ pub const Scanner = struct {
             bugPrint("{any}\n", .{i});
     }
 
-    pub fn deinit_arrayList(self: *Scanner, alloc: Allocator) void {
+    pub fn deinit_TokenList(self: *Scanner, alloc: Allocator) void {
         self.tokens.deinit(alloc);
+    }
+
+    pub fn deinit_ErrorList(self: *Scanner, alloc: Allocator) void {
+        self.errors.deinit(alloc);
     }
 };

@@ -33,11 +33,12 @@ const lox = struct {
         var reader = file.reader(buffer);
         try reader.interface.fill(@as(usize, file_size));
 
-        bugPrint("file size: {any}\n", .{file_size});
+        bugPrint("file size: {any} bytes\n", .{file_size});
 
         var scanner = Scanner.init(alloc, buffer);
-        defer scanner.deinit_arrayList(alloc); 
-        try scanner.grabTokens(); //putting tokens in ArrayList
+        defer scanner.deinit_TokenList(alloc); 
+        defer scanner.deinit_ErrorList(alloc);
+        try scanner.grabTokens(); //putting tokens in TokenList and any errors in ErrorList
         scanner.printTokens();
         
         
