@@ -74,22 +74,18 @@ pub const Scanner = struct {
         var start: u64 = 0;
         var current: u64 = 0;
         var line: u64 = 1;
-
-        while (current < self.source.len) {
+        
+        while (!(current >= self.source.len)) {
             start = current;
-            if (self.source[current] == '\n')  {
-                line += 1;
-                current += 1;
-            } else { 
-                try scanToken(self, &current, line);
-                current += 1; 
-            }
+            try scanToken(self, &current, &line);
+            current += 1; 
         }
-        try self.tokens.append(self.alloc, Token.init(TokenType.EOF, "",line));
+
+        try self.tokens.append(self.alloc, Token.init(TokenType.EOF, "", line));
     }
 
     //token engine
-    fn scanToken(self: *Scanner, current: *u64, line: u64) !void {
+    fn scanToken(self: *Scanner, current: *u64, line: *u64) !void {
         const index = @as(usize, current.*);
         const cur: u8 = self.source[index];
 
@@ -98,68 +94,69 @@ pub const Scanner = struct {
             '\t' => { },
             '\r' => { },
             ' '  => { },
-
+            '\n' => { line.* += 1; },
+            
             //single char tokens 
             '(' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.LEFT_PAREN,
                     "",
-                    line)); },
+                    line.*)); },
             ')' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.RIGHT_PAREN,
                     "",
-                    line)); },
+                    line.*)); },
             '{' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.LEFT_BRACE,
                     "",
-                    line)); },
+                    line.*)); },
             '}' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.RIGHT_BRACE,
                     "",
-                    line)); },
+                    line.*)); },
             ',' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.COMMA,
                     "",
-                    line)); },
+                    line.*)); },
             '.' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.DOT,
                     "",
-                    line)); },
+                    line.*)); },
             '-' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.MINUS,
                     "",
-                    line)); },
+                    line.*)); },
             '+' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.PLUS,
                     "",
-                    line)); },
+                    line.*)); },
             ';' => { try self.tokens.append(
                 self.alloc, 
                 Token.init(
                     TokenType.SEMICOLON,
                     "",
-                    line)); },
+                    line.*)); },
             '*' => { try self.tokens.append(
                 self.alloc,
                 Token.init(
                     TokenType.STAR,
                     "",
-                    line)); },
+                    line.*)); },
 
             //double char tokens
             '!' => { 
@@ -169,7 +166,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.BANG_EQUAL,
                             "",
-                            line));
+                            line.*));
                         current.* += 1;
                     } else {
                         try self.tokens.append(
@@ -177,7 +174,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.BANG,
                             "",
-                            line));
+                            line.*));
                     }
                 },
             '=' =>  { 
@@ -187,7 +184,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.EQUAL_EQUAL,
                             "",
-                            line));
+                            line.*));
                         current.* += 1;
                     } else {
                         try self.tokens.append(
@@ -195,7 +192,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.EQUAL,
                             "",
-                            line));
+                            line.*));
                     }
                 },
             '<' => { 
@@ -205,7 +202,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.LESS_EQUAL,
                             "",
-                            line));
+                            line.*));
                         current.* += 1;
                     } else {
                         try self.tokens.append(
@@ -213,7 +210,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.LESS,
                             "",
-                            line));
+                            line.*));
                     }
                 },
             '>' => { 
@@ -223,7 +220,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.GREATER_EQUAL,
                             "",
-                            line));
+                            line.*));
                         current.* += 1;
                     } else {
                         try self.tokens.append(
@@ -231,7 +228,7 @@ pub const Scanner = struct {
                         Token.init(
                             TokenType.GREATER,
                             "",
-                            line));
+                            line.*));
                     }
                 },
 
@@ -240,25 +237,54 @@ pub const Scanner = struct {
                 if (self.source[index + 1] == '/') {
                     var n: u8 = 2;
                     while (self.source[index + n] != '\n') { n += 1; }
-                    //minus 1 to trigger the newline conditional
-                    //in the calling while loop (a bit clumsy)
-                    current.* += n - 1; 
+                    current.* += n; 
                 } else {
                     try self.tokens.append(
                     self.alloc,
                     Token.init(
                         TokenType.SLASH,
                         "",
-                        line));
+                        line.*));
                 }
             },
-            
+
+            //string literals
+           '"' => {
+                    var n: usize = 1;
+                    while ((index + n) < self.source.len and self.source[index + n] != '"') {
+                        if (self.source[index + n] == '\n') {
+                            //add line if string spans multiple lines 
+                            line.* += 1;
+                        }
+                        n += 1;
+                    }
+
+                    if (index + n == self.source.len) {
+                        current.* += n;
+                        try self.errors.append(
+                            self.alloc,
+                            Error.init(
+                                line.* - 1, //unix files typically end with a \n even if there is not technically a new line in file
+                                "Unterminated string",
+                                cur));
+                    } else {
+                        current.* += n;
+                        const string: []const u8 = self.source[index..index + (n + 1)]; //to grab the closing quotation mark
+                        try self.tokens.append(
+                            self.alloc,
+                            Token.init(
+                                TokenType.STRING,
+                                string,
+                                line.*));
+                    }
+                }, 
+
             //unrecognised token
             else => {
                 try self.errors.append(
                 self.alloc,
                 Error.init(
-                    line,
+                    line.*,
                     "Unrecognised token",
                     cur));
             }
@@ -268,7 +294,7 @@ pub const Scanner = struct {
     pub fn printTokens(self: *Scanner) void {
         bugPrint("Tokens in list: \n", .{});
         for (self.tokens.items) |i|
-            bugPrint("{any}\n", .{i});
+            bugPrint("{any} => lexeme: {s}\n", .{i, i.lexeme});
     }
 
     pub fn deinit_TokenList(self: *Scanner, alloc: Allocator) void {
