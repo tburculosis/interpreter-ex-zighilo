@@ -1,6 +1,6 @@
 const std = @import("std");
 const Error = @import("error.zig").Error;
-const Scanner = @import("token.zig").Scanner;
+const Scanner = @import("engine.zig").Scanner;
 
 const bugPrint = std.debug.print;
 const Allocator = std.mem.Allocator;
