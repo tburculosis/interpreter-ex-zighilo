@@ -36,8 +36,7 @@ const lox = struct {
         bugPrint("file size: {any} bytes\n", .{file_size});
 
         var scanner = Scanner.init(alloc, buffer);
-        defer scanner.deinit_TokenList(alloc); 
-        defer scanner.deinit_ErrorList(alloc);
+        defer scanner.deinit_scanner(alloc);
         try scanner.grabTokens(); //putting tokens in TokenList and any errors in ErrorList
         scanner.printTokens();
         
